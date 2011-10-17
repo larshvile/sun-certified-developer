@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<ruleset name="SCJD"
+    xmlns="http://pmd.sf.net/ruleset/1.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://pmd.sf.net/ruleset/1.0.0 http://pmd.sf.net/ruleset_xml_schema.xsd"
+    xsi:noNamespaceSchemaLocation="http://pmd.sf.net/ruleset_xml_schema.xsd">
+    
+    
+    <rule ref="rulesets/optimizations.xml">
+        <exclude name="MethodArgumentCouldBeFinal" />
+        <exclude name="AvoidInstantiatingObjectsInLoops" />
+    </rule>    
+    <rule ref="rulesets/javabeans.xml">
+        <exclude name="BeanMembersShouldSerialize" />
+    </rule>
+    <rule ref="rulesets/naming.xml">
+        <exclude name="LongVariable" />
+        <exclude name="ShortVariable" />
+        <exclude name="VariableNamingConventions" />
+    </rule>
+    <rule ref="rulesets/imports.xml">
+        <exclude name="UnusedImports" />
+    </rule>
+    <rule ref="rulesets/strictexception.xml">
+        <exclude name="AvoidThrowingRawExceptionTypes" />
+    </rule>
+    <rule ref="rulesets/codesize.xml">
+        <exclude name="TooManyMethods" />
+    </rule>
+    <rule ref="rulesets/design.xml">
+        <exclude name="MissingBreakInSwitch" />
+    </rule>
+    <rule ref="rulesets/typeresolution.xml">
+        <exclude name="UnusedImports" />
+    </rule>
+    
+    
+    <rule ref="rulesets/basic.xml"/>
+	<rule ref="rulesets/braces.xml"/>
+	<rule ref="rulesets/clone.xml"/>
+	<rule ref="rulesets/coupling.xml"/>
+	<rule ref="rulesets/finalizers.xml"/>
+	<rule ref="rulesets/junit.xml"/>
+	<rule ref="rulesets/migrating.xml"/>	
+	<rule ref="rulesets/strings.xml"/>
+	<rule ref="rulesets/sunsecure.xml"/>
+	<rule ref="rulesets/unusedcode.xml"/>
+	
+	<!-- 
+	<rule ref="rulesets/controversial.xml"/>
+    <rule ref="rulesets/j2ee.xml"/>
+    <rule ref="rulesets/logging-jakarta-commons.xml"/>
+    <rule ref="rulesets/logging-java.xml"/>
+     -->
+  
+</ruleset>

@@ -1,0 +1,302 @@
+[ Table of contents ]
+
+ 1. Framework
+    1.1  Logging
+    1.2  Internationalization
+    
+ 2. The data-layer
+    2.1  DuplicateKeyException & the mystical key
+    2.2  DataFileAccess, separating low level file-access from the database
+    2.3  DatabaseException
+    2.4  Unlocking deleted records
+    2.4  Charset
+    2.6  Null-terminated strings
+    2.7  ExtendedDBMain
+    2.8  Dao
+    2.9  Enforcing locking-rules
+    2.10 File access
+    
+ 3. Locking & synchronization
+    3.1  Database-file
+    3.2  Threadsafety in Data (DBMain)
+    3.3  Record-locking
+    
+ 4. User Interface
+    4.1  General considerations
+    4.2  Framework for extensions
+    
+ 5. Remoting
+    5.1  Separation of remoting and the rest of the application
+    5.2  Dynamic proxies used as adapters / decorators
+    
+    
+    
+1. Framework
+
+1.1 Logging
+===========
+The application logs all messages using standard java.util.logging. The log-
+configuration is in logging.properties and is initialized by Main.java. It
+logs to the console only.
+
+
+1.2 Internationalization
+========================
+An internationalization-framework has been created using a ResourceBundle
+which currently loads it's texts from text.properties. See config.TextResolver
+for the code.
+
+
+2. The data-layer
+
+2.1 DuplicateKeyException & the mystical key
+============================================
+In the provided DBMain interface, there is a reference to a DuplicateKeyException.
+The existence of this exception implies that each record holds some kind of key,
+but no clues are given as to what the key actually is.
+
+The solution most natural to me would be to use the record-id as the key since
+this is the current lookup-mechanism anyway, but then there would be no need
+for the DuplicateKeyException, so I'm working under the assumption that the
+key is something related to the record's data.
+
+Amongst the db's fields, name & location seems like the most appropriate values
+to use as keys, so I'm using these fields as a composite-key.
+
+This choice however, creates some other problems:
+
+ 1. DBMain.update() is unable to throw DuplicateKeyException, but the key can
+    obviously be changed by modifying the name/location fields. The solution
+    chosen is to throw a RuntimeException indicating key-violations in update(),
+    this is of course not an optimal solution. 
+    
+ 2. The decision of making name/location a record's key should really be made
+    in the database-file (key-columns should be defined). But with the
+    database-file's design I see no other option than to 'hardcode'
+    the key-logic in Data.java. This in turn creates an undesired dependency
+    between the generic Data-class and the file on which it operates.
+    
+The unique-key constraint is enforced by Data's verifyUniqueKey() method,
+which is called by create() and update().
+
+
+2.2 DataFileAccess, separating low level file-access from the database
+======================================================================
+DBMain's implementation class Data became cluttered with low-level file-access
+details, so a second class DataFileAccess was created to take care of the problem.
+The former class deals with the database like it actually is a database,
+seaching for records, reading / updating, locking etc. while DataFileAccess
+takes care of the database's file-format, reuse of 'open' record-slots and
+other low-level detais.
+
+
+2.3 DatabaseException
+=====================
+A runtime-exception was required to signal implementation-specific errors from
+DBMain's implementation-classes without actually modifying the DBMain-interface.
+One example of it's usage is that RMI-related exceptions are wrapped in
+DatabaseException's before reaching client-code.
+
+
+2.4 Unlocking deleted records
+=============================
+The assignment clearly states that DBMain.unlock() should throw
+RecordNotFoundException if a record is deleted.
+
+"Any methods that throw RecordNotFoundException should do so if a specified
+record does not exist or is marked as deleted in the database file."
+
+This implies that if the client locks a record & deletes it, the record
+should never be 'manually' unlocked. To completely follow the assignment-spec
+I had to create the method Data.removeLockForDeletedRecord() which basically
+checks if a record is locked when being deleted, and unlocks it. Otherwise we
+would have a memory-leak for each deleted record.
+
+
+2.5 Charset
+===========
+The assignment states that text-fields are stored in 8bit US ASCII. The US-ASCII
+charset in java uses only 7 of the 8 bits, but I'm using it anyway.
+
+
+2.6 Null-terminated strings
+===========================
+The assignment states that fields which are smaller than the total field-length
+are null-terminated. In fact they seem to be padded with spaces (ascii 32). The
+solution to this has been to add a trim() before returning the value
+(DataFileAccess.readString), even if this violates the assignment-spec.
+
+
+2.7 ExtendedDBMain
+===========================
+The assignment states that DBMain can't be modified, but to create a looser
+coupling between the GUI and data-layers I created an extended interface
+called ExtendedDBMain which gives access to some extra meta-data for the
+rest of the application. This meta-data allows me to do input-verification
+of data in the UI-layer (almost) without depending on any 'hardcoded' 
+information about the database's format. I say almost because there's some
+logic regarding which fields that are editable, which is based on hardcoded
+field-names.
+
+
+2.8 Dao
+===========================
+The package 'suncertify.dao' was created to expose the database in a more
+traditional way using record-object's and a data-access-object interface (Dao)
+with more course-grained methods, better suited for network-transport.
+The new Dao-interface has less method-calls when searching for records as
+it returns an array of Record objects instead of a an array of record-id's
+each requiring a read() call. It also encapsulates the locking better,
+whenever a record is locked, the latest copy of that record is returned.
+
+
+2.9 Enforcing locking-rules
+===========================
+The DBMain interface has lock/unlock methods, but it's not clear how (or if)
+the locking rules should be enforced. I've chosen to assume that the spec
+implicitly states that records must be locked before modification. Since no
+specific exception-type for this type of error is defined in DBMain, and
+because these kinds of failures would certainly be picked up during development
+/ testing, I've chosen to enforce the rules using asserts.
+These asserts can be found in Data's update(), delete() and unlock() methods.
+
+One thing that can't be enforced with the current system is that client A
+can (hypothetically) unlock records which are locked by client B. To solve
+this we would have to introduce some kind of session, where record-locks
+belong to a given session/client. This can't (and shouldn't) be done in an
+implementation of DBMain, but rather in some higher-level class. I have not
+spent time on this since the assignment states that such features won't give
+any extra score.
+
+
+2.10 File access
+================
+I've chosen to use a RandomAccessFile for the db-file access. Using a
+RandomAccessFile has some advantages over regular streams:
+
+ 1. deleted entries can be (and are) replaced efficiently by new records
+ 2. no need to keep the entire db in memory at once, although memory-caching
+    would be required at some point.
+ 3. no need to update the entire file on changes, only the changed parts are
+    written.
+ 4. opening in 'rws' mode ensures that metadata and file-contents are actually
+    written to disk for each update/delete, which makes sense for a database.
+
+
+3. Locking & synchronization
+
+3.1 Database-file
+=================
+File-level locking is implicitly handled by the RandomAccessFile which is
+opened in read/write mode.
+
+
+3.2 Threadsafety in Data (DBMain)
+=================================
+The Data class is safeguarded against multiple threads by using an internal
+lock 'stateLock'. All operations that modify/use the internal state, including
+reading/writing to the actual database-file, are synchronized using this lock.
+
+I've chosen to use this 'manual' locking mechanism as opposed to method-level
+synchronization because I find it easier to see which parts of a method that
+are synchronized because of the extra nesting level. An additional bonus is
+that exception-handling and verification of input-data can be done outside
+of the lock. This is purely a matter of taste, method-level synchronization
+would have worked.
+
+
+3.3. Record-locking
+===================
+Record-level locking is done using a custom lock-type, SimpleLock, which
+emulates a ReentrantLock, but has no concept of a thread-owner. It is implemented
+as a wrapper on top of the regular java-monitoring system (wait/notify).
+
+The reason why I couldn't use ReentrantLocks was because of the thread-owner
+concept, which doesn't work in an RMI-environment. In an RMI-environment you
+have no guarantee that the same thread will be used to dispatch two consecutive
+invocations from a client.
+
+The record-level locks are managed by Data, where they're held in a Map of
+record-id + SimpleLock. These locks fulfill the requirement that the locking
+threads should consume no CPU-cycles until a record is available, while at
+the same time only block a single record.
+
+In Data's lock() method a potential deadlock situation could occur if the
+SimpleLock was acquired within the synchronized(stateLock) block. Extra
+care has been taken to avoid this, and the case has been documented in the code.
+
+The SimpleLocks aren't removed from the map when a record is unlocked. If
+the database is large this would be a problem, but for the current database-size
+it's not an issue. The reason why I'm not removing them is that it's complicated.
+There's a potential race-condition on line 268 in Data (right after the
+synchronized block in lock()). There's no way to guarantee that another thread
+isn't trying to acquire a record-lock that we're removing. A solution to this 
+could be to periodically block all calls to lock()/unlock(), iterate over the
+lock-map and remove all locks that aren't in use.
+
+
+4. User Interface
+
+4.1 General considerations
+==========================
+The user-interface code (suncertify.gui) has been coded with the intention
+of having almost no coupling to the rest of the application. Most of the
+classes in the package are package-private and only accessed through the
+GuiFactory.
+
+The UI-code also depends very little on the rest of the application, it only
+requires an instance of the Dao-interface to operate.
+
+One other interesting GUI-feature is the ConfigurationObserver interface,
+which basically lets the application-starter (Main.java) be notified of
+configuration-changes without being coupled to the GUI-code at all. This
+interface is used in the read-config / try-to-start / modify-config loop
+in Main.java.
+
+
+4.2 Framework for extensions
+============================
+One feature that probably would be added later in this application is an 
+administrator-mode, where you can edit all the fields of a record, and add
+new records. ClientFrame.getEditableFields() is a good extension-point for adding
+an administrator-mode later on, and a comment regarding this has been added to
+the method.
+
+
+5. Remoting
+
+5.1 Separation of remoting and the rest of the application
+==========================================================
+In the remoting-package, you'll find the RemoteDao interface, which is basically
+a copy of the Dao interface. This has been done because I don't want to expose
+RMI's Remote / RemoteException to the rest of the application. I feel that it's
+better to duplicate an interface than to expose implementation-specific details
+in the interfaces.
+The application only uses RegistryHelper, which is the only public class in
+the package, to access RMI. All the remoting-complexity is hidden behind this
+class.
+
+
+5.2 Dynamic proxies used as adapters / decorators
+=================================================
+The package also contains some factory-classes that adapts/decorates
+Dao-instances for RMI-usage, totally contained within the remoting-package.
+
+ - InstrumentedServerDaoFactory
+        A static factory used to decorate a Dao-instance with extra server/RMI-
+        related logging.
+ - RemoteClientDaoAdapterFactory
+        A static factory used to adapt RemoteDao's to Dao's. Basically converts
+        RemoteExceptions to DatabaseExceptions.
+ - RemoteServerDaoAdapaterFactory
+        A static factory used to adapt Dao's to RemoteDao's.
+        
+These factories create the adapter/decorators by wrapping a Dao/RemoteDao in
+a dynamix proxy which adds logging, or modifies the method-signatures.
+
+With this framework in place, you could easily add more decorators without
+disturbing the rest of the application at all. Some examples could be:
+ - show which records that are locked by remote clients
+ - show the latest operations by remote clients
+ - show which clients that are connected, although this would require a custom
+   socket-factory for the RMI-server.

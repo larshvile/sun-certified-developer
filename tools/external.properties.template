@@ -1,0 +1,3 @@
+findbugs.home	= /home/lars/bin/findbugs/current
+pmd.home		= /home/lars/bin/pmd/current
+checkstyle.home	= /home/lars/bin/checkstyle/current

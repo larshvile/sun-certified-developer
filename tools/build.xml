@@ -1,0 +1,299 @@
+<project
+  name		= "scjd"
+  default	= "report"
+  basedir	= "../"		>
+	
+	
+	<!-- read property-files -->
+	<property file="tools/build.properties" />
+	<property file="tools/external.properties" />
+	
+	<!-- set global properties for this build -->
+	<property name="target"			value="target"/>
+	<property name="build"			value="${target}/build"/> 
+	<property name="release"		value="${target}/release"/>
+	<property name="reports"		value="${target}/reports"/>
+	
+	<property name="src.main"		value="src/main"/>
+	<property name="src.test"		value="src/test"/>
+	
+	<property name="assignment"     value="assignment"/>
+	<property name="doc"            value="doc"/>
+	
+	<!-- classpath's -->
+	<path id="cp.main">
+	</path>
+	
+	<path id="cp.test">
+		<fileset dir="${src.test}/lib" includes="*.jar" />
+		<pathelement location="${build}/classes"/>
+		<pathelement location="${src.test}/resources"/>
+	</path>
+	
+	<path id="cp.findbugs">
+		<fileset dir="${findbugs.home}/lib">
+	        <include name="findbugs-ant.jar"/>
+	    </fileset>
+	</path>
+	
+	<path id="cp.pmd">		
+	    <fileset dir="${pmd.home}/lib/">
+	        <include name="*.jar"/>
+	    	<exclude name="junit*.jar"/>
+	    </fileset>
+		<pathelement location="${src.test}/config"/>
+	</path>
+	
+	<path id="cp.checkstyle">
+		<fileset dir="${checkstyle.home}">
+            <include name="checkstyle-all-*.jar"/>
+        </fileset>
+		<pathelement location="${build}/classes"/>
+	</path>
+	
+	
+	<!-- [clean] -->
+	<target name="clean" description="clean up" >
+		<delete dir="${build}"		/>
+		<delete dir="${release}"	/>
+		<delete dir="${reports}"	/>
+	</target>
+	
+	
+	<!-- [createdirs] -->
+	<target name="createdirs" depends="clean">
+		<mkdir dir="${target}"/>
+	
+		<mkdir dir="${build}"/>
+		<mkdir dir="${build}/classes"/>
+		<mkdir dir="${build}/test-classes"/>
+		<mkdir dir="${build}/package"/>
+		
+		<mkdir dir="${reports}"/>
+		<mkdir dir="${reports}/junit/xml"/>
+		<mkdir dir="${reports}/findbugs"/>
+		<mkdir dir="${reports}/pmd"/>
+		<mkdir dir="${reports}/checkstyle"/>
+		<mkdir dir="${reports}/javadoc"/>
+	</target>
+	
+	
+	<!-- [compile] -->
+	<target name="compile" depends="createdirs">
+		<javac
+		  sourcepath	= ""
+		  srcdir		= "${src.main}/java"
+		  destdir		= "${build}/classes"
+		  debug			= "${source.debug}"
+		  source		= "${source.version}"
+		  target		= "${source.version}"
+		  encoding		= "${source.encoding}" >
+			<classpath refid="cp.main" /> 
+			<include name="**/*.java"/>
+		</javac>
+		<copy todir="${build}/classes">
+	        <fileset dir="${src.main}/resources" />
+		</copy>
+	</target>
+	<!-- [compile] -->
+	
+	
+	<!-- [test] -->
+	<target name="test" depends="compile">
+		
+		<!-- compile -->
+		<javac
+		  sourcepath	= ""
+		  srcdir		= "${src.test}/java"
+		  destdir		= "${build}/test-classes"
+		  debug			= "on"
+		  source		= "${source.version}"
+		  target		= "${source.version}"
+		  encoding		= "${source.encoding}" >
+			<classpath refid="cp.main" /> 
+			<classpath refid="cp.test" />
+			<include name="**/*.java"/>
+		</javac>
+		
+		<!-- run 'em -->
+		<junit
+		  haltonerror	= "false"
+		  haltonfailure	= "false"
+		  printsummary	= "true"
+		  fork          = "on"
+	      forkmode      = "perBatch">
+			
+			<assertions>
+			    <enable/>
+			</assertions>
+			
+			<classpath>
+				<path refid="cp.main" />
+				<path refid="cp.test" />
+				<pathelement location="${build}/test-classes"/>
+				<pathelement location="${src.test}/resources"/>
+			</classpath>
+			
+			<formatter type="xml"/>
+			
+			<batchtest fork="yes" todir="${reports}/junit/xml">
+				<fileset dir="${src.test}/java">
+			    	<include name="**/*Test.java"/>
+					<exclude name="**/*Abstract*.java"/>
+				</fileset>
+			</batchtest>	
+		</junit>
+		<!-- run 'em -->
+		
+		<!-- create an html report -->
+		<junitreport todir="${reports}/junit/xml">
+		    <fileset dir="${reports}/junit/xml">
+		    	  <include name="TEST-*.xml"/>
+	        </fileset>
+	    	<report format="frames" todir="${reports}/junit"/>
+		</junitreport>
+	</target>	
+	<!-- [test] -->
+	
+	
+	<!-- runFindBugs -->	
+	<target name="runFindBugs" depends="compile">
+		<property name="findbugs.error"		value="false"	/>
+		<property name="findbugs.warning"	value="false"	/>
+		
+		<!-- import the ant-task -->
+		<taskdef
+		  name			= "findbugs"
+		  classpathref	= "cp.findbugs"
+		  classname		= "edu.umd.cs.findbugs.anttask.FindBugsTask"/>
+		
+		<!-- execute -->
+		<!-- excludefilter        = "${src.test}/config/findbugs_exclude.xml" -->
+		<findbugs
+		  projectname		= "${project.name}"
+		  home				= "${findbugs.home}"		  
+		  output			= "html"
+		  outputfile		= "${reports}/findbugs/report.html"
+		  reportlevel		= "medium"
+		  failonerror		= "true"		
+		  effort			= "max"
+		  errorproperty		= "findbugs.error"
+		  warningsproperty	= "findbugs.warning" >
+			<sourcepath path="${src.main}/java"/>
+			<class location="${build}/classes"/>
+			<auxclasspath refid="cp.main"/>
+		</findbugs>
+		<!-- execute -->
+		
+		<!-- report -->
+		<echo>Errors:   ${findbugs.error}</echo>
+		<echo>Warnings: ${findbugs.warning}</echo>	
+	</target>
+	<!-- runFindBugs -->
+		
+	
+	<!-- [runPMD] -->
+	<target name="runPMD" depends="compile">
+		
+		<!-- import ant-task -->
+		<taskdef
+		  name			= "pmd"
+		  classname		= "net.sourceforge.pmd.ant.PMDTask"
+		  classpathref	= "cp.pmd" />
+		
+		<!-- execute -->
+		<pmd
+		  rulesetfiles = "pmd_rules.xml" >
+			<formatter type="net.sourceforge.pmd.renderers.HTMLRenderer" toFile="${reports}/pmd/report.html"/>
+			<fileset dir="${src.main}/java">
+				<include name="**/*.java"/>
+			</fileset>
+		</pmd>
+	</target>
+	<!-- [runPMD] -->
+	
+	
+	<!--[runCheckstyle] -->
+	<target name="runCheckstyle" depends="compile">
+		
+		<!-- ant-task -->
+		<taskdef
+		  name            = "checkstyle"
+		  classname       = "com.puppycrawl.tools.checkstyle.CheckStyleTask"
+		  classpathref    = "cp.checkstyle" />
+		
+		<!-- execute -->
+		<checkstyle config="${src.test}/config/checkstyle_sun_checks.xml" failOnViolation="false">
+		    <fileset dir="${src.main}/java" includes="**/*.java"/>
+		    <formatter type="plain"/>
+		    <formatter type="xml" toFile="${reports}/checkstyle/errors.xml"/>
+		</checkstyle>
+		<xslt in="${reports}/checkstyle/errors.xml"  out="${reports}/checkstyle/report.html" style="${checkstyle.home}/../checkstyle-hult.xsl" />
+	</target>
+	<!--[runCheckstyle] -->
+	
+	
+	<!-- [javadoc] -->
+	<target name="javadoc" depends="createdirs">
+    	<javadoc packagenames="suncertify.*"
+	           sourcepath="${src.main}/java"
+	           defaultexcludes="yes"
+	           destdir="${reports}/javadoc"
+	           author="true"
+	           version="true"
+	           use="true"
+	           windowtitle="Sun Certified Developer - submission, Lars Hvile">
+	    <doctitle><![CDATA[<h1>Sun Certified Developer - submission, Lars Hvile</h1>]]></doctitle>	
+	  </javadoc>
+	</target>
+	
+	
+	<!-- [report] -->
+	<target name="report" depends="compile, test, runFindBugs, runPMD, runCheckstyle, javadoc" />
+	
+	
+	<!-- [build-jar] -->
+	<target name="build-jar" depends="compile, test, javadoc">
+		<jar destfile="${build}/runme.jar">
+	        <fileset dir="${build}/classes" />
+			<manifest>
+    	        <attribute name="Built-By" value="Lars Hvile"/>
+    	        <attribute name="Main-Class" value="suncertify.Main"/>
+		    </manifest>
+		</jar>
+	</target>
+	
+	
+	<!-- [package] -->
+	<target name="package" depends="build-jar">
+		
+		<!-- root -->
+		<copy todir="${build}/package">
+		    <fileset dir="${build}" includes="*.jar" />
+			<fileset dir="${assignment}" includes="*.db" />
+			<fileset dir="${assignment}" includes="version.txt" />
+		</copy>
+		
+		<!-- /code -->
+		<mkdir dir="${build}/package/code"/>
+		<copy todir="${build}/package/code">
+		    <fileset dir="${src.main}/java" />
+			<fileset dir="${src.main}/resources" />
+		</copy>
+		
+		<!-- /docs -->
+		<mkdir dir="${build}/package/docs" />
+		<copy todir="${build}/package/docs">
+			<fileset dir="${doc}" includes="choices.txt" />
+			<fileset dir="${doc}" includes="userguide.txt" />
+			<fileset dir="${assignment}" includes="instructions.html" />
+		</copy>
+		<copydir dest="${build}/package/docs/javadoc" src="${reports}/javadoc" />
+		
+		<!-- jar it up -->
+		<jar destfile="${target}/scjd-package.jar">
+			  <fileset dir="${build}/package" />
+		</jar>
+	</target>
+
+</project>

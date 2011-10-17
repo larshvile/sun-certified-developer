@@ -1,0 +1,107 @@
+[ Table of contents ]
+
+ 1. Database Server
+    1.1  Startup & configuration
+    1.2  Network
+    
+ 2. Client
+    2.1  Startup of the standalone client
+    2.2  Startup of the networked client
+    2.3  Searching for contractors
+    2.4  Booking a contractor
+    
+ 3. General
+    3.1  Modifying settings
+    
+ 4. Troubleshooting
+    4.1  General
+    4.2  Unable to start the networked client
+
+
+
+1. Database Server
+
+1.1 Startup & configuration
+===========================
+The first time the server-application is started you are required to select
+the location of an existing database file along with a network port that will
+be used for client/server communication.
+
+
+1.2  Network
+============
+The server uses RMI for it's network communication, if you have any firewalls
+in your network, be sure to open incoming ports '1099' and the user-defined port
+selected in the server-configuration.
+
+
+2. Client
+
+2.1 Startup of the standalone client
+====================================
+The first time the standalone-client is started you are required to select
+the location of an existing database file.
+
+
+2.2 Startup of the networked client
+===================================
+The first time the networked-client is started, or if it can't connect to the
+server, you are required to select the hostname / ip-address of the server.
+
+
+2.3 Searching for contractors
+=============================
+The contractor-search can be accessed from the Edit->Search menu, alternatively
+you can use the hotkey CTRL+F.
+The search-dialog contains input-fields for each field in the database.
+As an example if you are looking for plumber in metropolis you could enter
+"plumb" in specialties and "metro" in location. The contractor-search is
+case-insensitive.
+
+Starting a search can be done by clicking the 'Search' button, or simply pressing
+the enter-key. The matching contractors will be displayed in a table in the
+main application frame.
+
+If you want to hide the search-dialog after a search, close the dialog or
+simply press the escape-button.
+
+
+2.4 Booking a contractor
+========================
+To a book a contractor, either navigate to it using the keyboard's arrow-keys
+and press enter, or double-click it with the mouse. If you receive a notice
+that the record is locked by another user, this means that someone else is
+trying to book it. Once selected, an edit-dialog will appear that allows you to
+edit the 'owner' field. 
+
+When editing records, pay extra attention to the 'owner' field. Even if the
+'owner' field is blank in the main application frame, it may be filled when you
+open the edit-dialog. This happens when someone has booked the record after
+you started the search.
+
+
+3. General
+
+3.1 Modifying settings
+======================
+Settings can be modified from the menu edit->settings. Although the settings can
+be modified while the application is running, a restart of the application is
+required before the settings take effect.
+
+
+4. Troubleshooting
+
+4.1 General
+===========
+Any unexpected errors are written to the application-log in full detail,
+checking this log might help to resolve problems.
+
+
+4.3 Unable to start the networked client
+========================================
+If you are unable to start the networked client, verify that:
+ a. the server is running at the specified host
+ b. that there isn't a firewall on the server preventing incoming connections
+ c. that there isn't a firewall on the client preventing outgoing connections
+ d. that the server's hostname resolves to it's real ip-address (not 127.0.0.1)
+    locally on the server.

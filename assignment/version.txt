@@ -1,0 +1,2 @@
+jdk:      1.6.0_18
+platform: Fedora 12 / Linux 2.6.32.9-70.fc12.x86_64 x86_64
